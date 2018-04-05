@@ -23,11 +23,17 @@ import (
 	"github.com/pborman/uuid"
 	"golang.org/x/net/context"
 	"k8s.io/cloud-provider-openstack/pkg/csi/cinder/openstack"
-	volumeutil "k8s.io/kubernetes/pkg/volume/util"
 )
+
+// GiB is a handy constant since Cinder does everything in GiB increments
+const GiB int64 = (1024 * 1024 * 1024)
 
 type controllerServer struct {
 	*csicommon.DefaultControllerServer
+}
+
+func roundUpSize(volumeSizeBytes int64) int64 {
+	return (volumeSizeBytes + GiB - 1/GiB)
 }
 
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
@@ -39,11 +45,13 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Volume Size - Default is 1 GiB
-	volSizeBytes := int64(1 * 1024 * 1024 * 1024)
+	volSizeBytes := GiB
 	if req.GetCapacityRange() != nil {
 		volSizeBytes = int64(req.GetCapacityRange().GetRequiredBytes())
 	}
-	volSizeGB := int(volumeutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
+
+	// We're blindly shoving an int64 into an int here and risking truncation, but going this direction *should* be ok; migh consider adding a check later?
+	volSizeGB := int(roundUpSize(volSizeBytes))
 
 	// Volume Type
 	volType := req.GetParameters()["type"]
