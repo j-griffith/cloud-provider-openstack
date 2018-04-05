@@ -25,6 +25,7 @@ import (
 	"gopkg.in/gcfg.v1"
 )
 
+// IOpenStack defines the interface for the OpenStack Provider
 type IOpenStack interface {
 	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error)
 	DeleteVolume(volumeID string) error
@@ -35,11 +36,13 @@ type IOpenStack interface {
 	GetAttachmentDiskPath(instanceID, volumeID string) (string, error)
 }
 
+// OpenStack provides the OpenStack comput and blockstorage clients
 type OpenStack struct {
 	compute      *gophercloud.ServiceClient
 	blockstorage *gophercloud.ServiceClient
 }
 
+// Config includes all the necessary credentials and endpoint info to access the OpenStack Provider
 type Config struct {
 	Global struct {
 		AuthUrl    string `gcfg:"auth-url"`
@@ -70,6 +73,7 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 	}
 }
 
+// GetConfigFromFile parses the supplied file and initializes the OpenStack provider using the supplied info
 func GetConfigFromFile(configFilePath string) (gophercloud.AuthOptions, gophercloud.EndpointOpts, error) {
 	// Get config from file
 	var authOpts gophercloud.AuthOptions
@@ -97,6 +101,7 @@ func GetConfigFromFile(configFilePath string) (gophercloud.AuthOptions, gophercl
 	return authOpts, epOpts, nil
 }
 
+// GetConfigFromEnv provides an alternative intialization method reading from the users env vars
 func GetConfigFromEnv() (gophercloud.AuthOptions, gophercloud.EndpointOpts, error) {
 	// Get config from env
 	authOpts, err := openstack.AuthOptionsFromEnv()
@@ -113,14 +118,17 @@ func GetConfigFromEnv() (gophercloud.AuthOptions, gophercloud.EndpointOpts, erro
 	return authOpts, epOpts, nil
 }
 
+// OSInstance is the OpenStack provider struct, set to nil here, we'll init when called by consumer
 var OsInstance IOpenStack = nil
 var configFile string = "/etc/cloud.conf"
 
+// InitOpenStackProvider intializes an OpenStack Provider
 func InitOpenStackProvider(cfg string) {
 	configFile = cfg
 	glog.V(2).Infof("InitOpenStackProvider configFile: %s", configFile)
 }
 
+// GetOpenStackProvider initializes an OsInstance and returns it ready for use to the caller
 func GetOpenStackProvider() (IOpenStack, error) {
 
 	if OsInstance == nil {

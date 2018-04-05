@@ -45,6 +45,7 @@ var (
 	version = "0.2.0"
 )
 
+// NewDriver initializes a new csi-cinder driver
 func NewDriver(nodeID, endpoint string, cloudconfig string) *driver {
 	glog.Infof("Driver: %v version: %v", driverName, version)
 
@@ -66,18 +67,21 @@ func NewDriver(nodeID, endpoint string, cloudconfig string) *driver {
 	return d
 }
 
+// NewControllerServer initializes a new csi-controller-server
 func NewControllerServer(d *driver) *controllerServer {
 	return &controllerServer{
 		DefaultControllerServer: csicommon.NewDefaultControllerServer(d.csiDriver),
 	}
 }
 
+// NewNodeServer initializes a new csi-node-server
 func NewNodeServer(d *driver) *nodeServer {
 	return &nodeServer{
 		DefaultNodeServer: csicommon.NewDefaultNodeServer(d.csiDriver),
 	}
 }
 
+// Run starts up the Node and Controller grpc servers
 func (d *driver) Run() {
 	openstack.InitOpenStackProvider(d.cloudconfig)
 	csicommon.RunControllerandNodePublishServer(d.endpoint, d.csiDriver, NewControllerServer(d), NewNodeServer(d))

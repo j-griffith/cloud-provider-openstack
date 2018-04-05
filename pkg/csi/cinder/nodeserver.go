@@ -31,6 +31,7 @@ type nodeServer struct {
 	*csicommon.DefaultNodeServer
 }
 
+// NodeGetID returns a unique identifier for this node
 func (ns *nodeServer) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) (*csi.NodeGetIdResponse, error) {
 
 	// Get Mount Provider
@@ -56,6 +57,7 @@ func (ns *nodeServer) NodeGetId(ctx context.Context, req *csi.NodeGetIdRequest) 
 	return ns.DefaultNodeServer.NodeGetId(ctx, req)
 }
 
+// NodePublishVolume performs the attach/mount of a Cinder volume to this node, used for Standalone Cinder deployments
 func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 
 	targetPath := req.GetTargetPath()
@@ -104,6 +106,7 @@ func (ns *nodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
+// NodeUnpublishVolume performs the detach/umount of a Cinder volume to this node, used for Standalone Cinder deployments
 func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 
 	targetPath := req.GetTargetPath()
@@ -131,10 +134,12 @@ func (ns *nodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
+// NodeUnstageVolume prep call, currently a noop for cinder
 func (ns *nodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
+// NodeStageVolume prep call, currently a noop for cinder
 func (ns *nodeServer) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	return &csi.NodeStageVolumeResponse{}, nil
 }

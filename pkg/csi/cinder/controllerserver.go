@@ -30,6 +30,7 @@ type controllerServer struct {
 	*csicommon.DefaultControllerServer
 }
 
+// CreateVolume formats the request and issues a cinder create call
 func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 
 	// Volume Name
@@ -43,6 +44,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	if req.GetCapacityRange() != nil {
 		volSizeBytes = int64(req.GetCapacityRange().GetRequiredBytes())
 	}
+
 	volSizeGB := int(volumeutil.RoundUpSize(volSizeBytes, 1024*1024*1024))
 
 	// Volume Type
@@ -77,6 +79,7 @@ func (cs *controllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}, nil
 }
 
+// DeleteVolume issue a cinder delete call
 func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 
 	// Get OpenStack Provider
@@ -99,6 +102,8 @@ func (cs *controllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVol
 	return &csi.DeleteVolumeResponse{}, nil
 }
 
+// ControllerPublishVolume performs the necessary steps to attach a volume using the controller model.  Use this function when you're running K8's on OpenStack
+// If you're using standalone Cinder (not using OpenStack Instances) you'll need to use the NodePublishVolume function)
 func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *csi.ControllerPublishVolumeRequest) (*csi.ControllerPublishVolumeResponse, error) {
 
 	// Get OpenStack Provider
@@ -141,6 +146,8 @@ func (cs *controllerServer) ControllerPublishVolume(ctx context.Context, req *cs
 	}, nil
 }
 
+// ControllerUnpublishVolume performs the necessary steps to detach a volume using the controller model. Use this function when you're running K8's on OpenStack
+// If you're using standalone Cinder (not using OpenStack Instances) you'll need to use the NodeUnpublishVolume function)
 func (cs *controllerServer) ControllerUnpublishVolume(ctx context.Context, req *csi.ControllerUnpublishVolumeRequest) (*csi.ControllerUnpublishVolumeResponse, error) {
 
 	// Get OpenStack Provider

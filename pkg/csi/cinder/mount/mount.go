@@ -36,6 +36,7 @@ const (
 	instanceIDFile      = "/var/lib/cloud/data/instance-id"
 )
 
+// IMount provides the interface required for a Mount implementation
 type IMount interface {
 	ScanForAttach(devicePath string) error
 	IsLikelyNotMountPointAttach(targetpath string) (bool, error)
@@ -45,11 +46,14 @@ type IMount interface {
 	GetInstanceID() (string, error)
 }
 
+// Mount is currently an unused/empty struct
 type Mount struct {
 }
 
+// MInstance is used to provide a filler for a MountProvider
 var MInstance IMount = nil
 
+// GetMountProvider returns MInstance
 func GetMountProvider() (IMount, error) {
 
 	if MInstance == nil {
@@ -82,7 +86,7 @@ func probeVolume() error {
 	return nil
 }
 
-// ScanForAttach
+// ScanForAttach interrogates the node to see if the specified device is attached
 func (m *Mount) ScanForAttach(devicePath string) error {
 	ticker := time.NewTicker(probeVolumeDuration)
 	defer ticker.Stop()
@@ -107,13 +111,13 @@ func (m *Mount) ScanForAttach(devicePath string) error {
 	}
 }
 
-// FormatAndMount
+// FormatAndMount performs a format and mount of the specified target device using the fstype and other options provided
 func (m *Mount) FormatAndMount(source string, target string, fstype string, options []string) error {
 	diskMounter := &mount.SafeFormatAndMount{Interface: mount.New(""), Exec: mount.NewOsExec()}
 	return diskMounter.FormatAndMount(source, target, fstype, options)
 }
 
-// IsLikelyNotMountPointAttach
+// IsLikelyNotMountPointAttach TBD
 func (m *Mount) IsLikelyNotMountPointAttach(targetpath string) (bool, error) {
 	notMnt, err := mount.New("").IsLikelyNotMountPoint(targetpath)
 	if err != nil {
@@ -127,7 +131,7 @@ func (m *Mount) IsLikelyNotMountPointAttach(targetpath string) (bool, error) {
 	return notMnt, err
 }
 
-// IsLikelyNotMountPointDetach
+// IsLikelyNotMountPointDetach TBD
 func (m *Mount) IsLikelyNotMountPointDetach(targetpath string) (bool, error) {
 	notMnt, err := mount.New("").IsLikelyNotMountPoint(targetpath)
 	if err != nil {
@@ -140,7 +144,7 @@ func (m *Mount) IsLikelyNotMountPointDetach(targetpath string) (bool, error) {
 	return notMnt, nil
 }
 
-// UnmountPath
+// UnmountPath issue an unmount command to the specified path
 func (m *Mount) UnmountPath(mountPath string) error {
 	return util.UnmountPath(mountPath, mount.New(""))
 }

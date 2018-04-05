@@ -43,6 +43,7 @@ const (
 	diskDetachSteps          = 13
 )
 
+// Volume represents a Cinder Volume
 type Volume struct {
 	// ID of the instance, to which this volume is attached. "" if not attached
 	AttachedServerId string
