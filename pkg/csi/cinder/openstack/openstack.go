@@ -22,18 +22,19 @@ import (
 	"github.com/golang/glog"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack"
+	"github.com/gophercloud/gophercloud/openstack/blockstorage/v3/volumes"
 	"gopkg.in/gcfg.v1"
 )
 
 type IOpenStack interface {
-	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error)
+	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (volumes.Volume, error)
 	DeleteVolume(volumeID string) error
 	AttachVolume(instanceID, volumeID string) (string, error)
 	WaitDiskAttached(instanceID string, volumeID string) error
 	DetachVolume(instanceID, volumeID string) error
 	WaitDiskDetached(instanceID string, volumeID string) error
 	GetAttachmentDiskPath(instanceID, volumeID string) (string, error)
-	GetVolumesByName(name string) ([]Volume, error)
+	GetVolumesByName(name string) ([]volumes.Volume, error)
 }
 
 type OpenStack struct {

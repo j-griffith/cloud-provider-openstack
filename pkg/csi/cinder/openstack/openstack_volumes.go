@@ -43,25 +43,8 @@ const (
 	diskDetachSteps          = 13
 )
 
-type Volume struct {
-	// ID of the instance, to which this volume is attached. "" if not attached
-	AttachedServerId string
-	// Device file path
-	AttachedDevice string
-	// Unique identifier for the volume.
-	ID string
-	// Human-readable display name for the volume.
-	Name string
-	// Current status of the volume.
-	Status string
-	// Volume size in GB
-	Size int
-	// Availability Zone the volume belongs to
-	AZ string
-}
-
 // CreateVolume creates a volume of given size
-func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error) {
+func (os *OpenStack) CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (*volumes.Volume, error) {
 	opts := &volumes.CreateOpts{
 		Name:             name,
 		Size:             size,
@@ -74,37 +57,26 @@ func (os *OpenStack) CreateVolume(name string, size int, vtype, availability str
 
 	vol, err := volumes.Create(os.blockstorage, opts).Extract()
 	if err != nil {
-		return "", "", err
+		return nil, err
 	}
 
-	return vol.ID, vol.AvailabilityZone, nil
+	return vol, nil
 }
 
 // GetVolumesByName is a wrapper around ListVolumes that creates a Name filter to act as a GetByName
 // Returns a list of Volume references with the specified name
-func (os *OpenStack) GetVolumesByName(n string) ([]Volume, error) {
-	var vlist []Volume
+func (os *OpenStack) GetVolumesByName(n string) ([]volumes.Volume, error) {
 	opts := volumes.ListOpts{Name: n}
 	pages, err := volumes.List(os.blockstorage, opts).AllPages()
 	if err != nil {
-		return vlist, err
+		return nil, err
 	}
 
 	vols, err := volumes.ExtractVolumes(pages)
 	if err != nil {
-		return vlist, err
+		return vols, err
 	}
-
-	for _, v := range vols {
-		volume := Volume{
-			ID:     v.ID,
-			Name:   v.Name,
-			Status: v.Status,
-			AZ:     v.AvailabilityZone,
-		}
-		vlist = append(vlist, volume)
-	}
-	return vlist, nil
+	return vols, nil
 }
 
 // DeleteVolume delete a volume
@@ -122,25 +94,13 @@ func (os *OpenStack) DeleteVolume(volumeID string) error {
 }
 
 // GetVolume retrieves Volume by its ID.
-func (os *OpenStack) GetVolume(volumeID string) (Volume, error) {
+func (os *OpenStack) GetVolume(volumeID string) (*volumes.Volume, error) {
 
 	vol, err := volumes.Get(os.blockstorage, volumeID).Extract()
 	if err != nil {
-		return Volume{}, err
+		return nil, err
 	}
-
-	volume := Volume{
-		ID:     vol.ID,
-		Name:   vol.Name,
-		Status: vol.Status,
-	}
-
-	if len(vol.Attachments) > 0 {
-		volume.AttachedServerId = vol.Attachments[0].ServerID
-		volume.AttachedDevice = vol.Attachments[0].Device
-	}
-
-	return volume, nil
+	return vol, nil
 }
 
 // AttachVolume attaches given cinder volume to the compute
@@ -150,12 +110,14 @@ func (os *OpenStack) AttachVolume(instanceID, volumeID string) (string, error) {
 		return "", err
 	}
 
-	if volume.AttachedServerId != "" {
-		if instanceID == volume.AttachedServerId {
+	if len(volume.Attachments) > 0 {
+		if isAttachedToServerID(volume.Attachments, instanceID) {
 			glog.V(4).Infof("Disk %s is already attached to instance %s", volumeID, instanceID)
 			return volume.ID, nil
 		}
-		return "", fmt.Errorf("disk %s is attached to a different instance (%s)", volumeID, volume.AttachedServerId)
+		// FIXME(JG): This will need to be updated for multiattach
+		// note the caller can inspect volume.attachments to get list of attached instances if desired
+		return "", fmt.Errorf("disk %s is attached to a different instance", volumeID)
 	}
 
 	_, err = volumeattach.Create(os.compute, instanceID, &volumeattach.CreateOpts{
@@ -170,7 +132,7 @@ func (os *OpenStack) AttachVolume(instanceID, volumeID string) (string, error) {
 }
 
 // WaitDiskAttached waits for attched
-func (os *OpenStack) WaitDiskAttached(instanceID string, volumeID string) error {
+func (os *OpenStack) WaitDiskAttached(instanceID, volumeID string) error {
 	backoff := wait.Backoff{
 		Duration: diskAttachInitDelay,
 		Factor:   diskAttachFactor,
@@ -178,11 +140,22 @@ func (os *OpenStack) WaitDiskAttached(instanceID string, volumeID string) error 
 	}
 
 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		attached, err := os.diskIsAttached(instanceID, volumeID)
+		volume, err := os.GetVolume(volumeID)
+		// We'll need to deal with multi-attach here, but until we figure out a clean
+		// way to add the Micro Versions in gophercloud we'll pretend it doesn't exist
 		if err != nil {
 			return false, err
 		}
-		return attached, nil
+		// Is attached isn't good enough, is it attached to the specified Instance is the real question
+		if len(volume.Attachments) > 0 {
+			for _, a := range volume.Attachments {
+				if a.ServerID == instanceID {
+					return true, nil
+				}
+			}
+
+		}
+		return false, nil
 	})
 
 	if err == wait.ErrWaitTimeout {
@@ -207,7 +180,7 @@ func (os *OpenStack) DetachVolume(instanceID, volumeID string) error {
 		return fmt.Errorf("can not detach volume %s, its status is %s", volume.Name, volume.Status)
 	}
 
-	if volume.AttachedServerId != instanceID {
+	if !isAttachedToServerID(volume.Attachments, instanceID) {
 		return fmt.Errorf("disk: %s has no attachments or is not attached to compute: %s", volume.Name, instanceID)
 	} else {
 		err = volumeattach.Delete(os.compute, instanceID, volume.ID).ExtractErr()
@@ -252,6 +225,8 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID, volumeID string) (string,
 	if volume.Status != VolumeInUseStatus {
 		return "", fmt.Errorf("can not get device path of volume %s, its status is %s ", volume.Name, volume.Status)
 	}
+	if !isAttachedToServerID(volume.Attachments, instanceID) {
+
 	if volume.AttachedServerId != "" {
 		if instanceID == volume.AttachedServerId {
 			return volume.AttachedDevice, nil
@@ -263,13 +238,16 @@ func (os *OpenStack) GetAttachmentDiskPath(instanceID, volumeID string) (string,
 }
 
 // diskIsAttached queries if a volume is attached to a compute instance
+// Deprecated: Inspect volume.Attachments instead.
 func (os *OpenStack) diskIsAttached(instanceID, volumeID string) (bool, error) {
 	volume, err := os.GetVolume(volumeID)
 	if err != nil {
 		return false, err
 	}
-
-	return instanceID == volume.AttachedServerId, nil
+	if len(volume.Attachments) > 0 {
+		return true, nil
+	}
+	return false, nil
 }
 
 // diskIsUsed returns true a disk is attached to any node.
@@ -279,4 +257,20 @@ func (os *OpenStack) diskIsUsed(volumeID string) (bool, error) {
 		return false, err
 	}
 	return volume.AttachedServerId != "", nil
+}
+
+func isAttachedToServerID(attachments volumes.Attachments, serverID string) bool {
+	for _, a := range attachments {
+		if a.ServerID == serverID {
+			return true
+		}
+	}
+	return false
+}
+
+// getFilteredAttachmentIndexes provides a function to search a list of attachments for a
+// filter and returns an list of indexes for cooresponding entries that match the filter.
+// for example to find all attachments attached to ServerID:
+//     `getFilteredAttachmentIndexes(attachments, "ServerID"="myserverID")`
+func getFilteredAttachmentIndexes(attachments volumes.Attachments, filter map[string]string) ([]int, error) {
 }
