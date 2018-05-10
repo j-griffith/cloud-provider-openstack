@@ -43,6 +43,8 @@ const (
 	diskDetachSteps          = 13
 )
 
+// Volume is our representation of a Cinder Volume
+// TODO: No need for this, we can just use the gohpercloud volume type directly
 type Volume struct {
 	// ID of the instance, to which this volume is attached. "" if not attached
 	AttachedServerId string

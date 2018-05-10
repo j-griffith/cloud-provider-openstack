@@ -18,7 +18,7 @@ package cinder
 
 import (
 	"golang.org/x/net/context"
-	"k8s.io/cloud-provider-openstack/pkg/csi/cinder/openstack"
+	"k8s.io/cloud-provider-openstack/pkg/csi/openstack"
 )
 
 var fakeNodeID = "CSINodeID"

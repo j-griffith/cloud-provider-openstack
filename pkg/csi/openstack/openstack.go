@@ -26,6 +26,7 @@ import (
 	"gopkg.in/gcfg.v1"
 )
 
+// IOpenStack defines our requirements to fulfill and OpenStack Type
 type IOpenStack interface {
 	CreateVolume(name string, size int, vtype, availability string, tags *map[string]string) (string, string, error)
 	DeleteVolume(volumeID string) error
@@ -40,11 +41,13 @@ type IOpenStack interface {
 	DeleteSnapshot(snapID string) error
 }
 
+// OpenStack is our OpenStack Provider, we only need compute and blockstorage
 type OpenStack struct {
 	compute      *gophercloud.ServiceClient
 	blockstorage *gophercloud.ServiceClient
 }
 
+// Config provides our configuration details including auth credentials to talk to Cinder endpoints
 type Config struct {
 	Global struct {
 		AuthUrl    string `gcfg:"auth-url"`
@@ -75,6 +78,7 @@ func (cfg Config) toAuthOptions() gophercloud.AuthOptions {
 	}
 }
 
+// GetconfigFromFile provides the ability to read in config from a specified file
 func GetConfigFromFile(configFilePath string) (gophercloud.AuthOptions, gophercloud.EndpointOpts, error) {
 	// Get config from file
 	var authOpts gophercloud.AuthOptions
@@ -102,6 +106,7 @@ func GetConfigFromFile(configFilePath string) (gophercloud.AuthOptions, gophercl
 	return authOpts, epOpts, nil
 }
 
+// GetconfigFromEnv provides a means to read in config options from environment variables
 func GetConfigFromEnv() (gophercloud.AuthOptions, gophercloud.EndpointOpts, error) {
 	// Get config from env
 	authOpts, err := openstack.AuthOptionsFromEnv()
@@ -118,14 +123,18 @@ func GetConfigFromEnv() (gophercloud.AuthOptions, gophercloud.EndpointOpts, erro
 	return authOpts, epOpts, nil
 }
 
+// OSInstance is a global variable to access our OpenStack type
 var OsInstance IOpenStack = nil
+
 var configFile string = "/etc/cloud.conf"
 
+//  InitOpenStackProvider takes is our initializiation from config file implementation
 func InitOpenStackProvider(cfg string) {
 	configFile = cfg
 	glog.V(2).Infof("InitOpenStackProvider configFile: %s", configFile)
 }
 
+// GetOpenStackProvider provides an accessor function for callers to get the OpenStack type
 func GetOpenStackProvider() (IOpenStack, error) {
 
 	if OsInstance == nil {
