@@ -21,7 +21,7 @@ import (
 	"github.com/golang/glog"
 
 	"github.com/kubernetes-csi/drivers/pkg/csi-common"
-	"k8s.io/cloud-provider-openstack/pkg/csi/cinder/openstack"
+	"k8s.io/cloud-provider-openstack/pkg/csi/openstack"
 )
 
 type driver struct {
@@ -45,6 +45,7 @@ var (
 	version = "0.2.0"
 )
 
+// NewDriver initializes a new cinder-csi driver
 func NewDriver(nodeID, endpoint string, cloudconfig string) *driver {
 	glog.Infof("Driver: %v version: %v", driverName, version)
 
@@ -66,18 +67,21 @@ func NewDriver(nodeID, endpoint string, cloudconfig string) *driver {
 	return d
 }
 
+// NewControllerServer returns a new controllerServer
 func NewControllerServer(d *driver) *controllerServer {
 	return &controllerServer{
 		DefaultControllerServer: csicommon.NewDefaultControllerServer(d.csiDriver),
 	}
 }
 
+// NewNodeServer returns a new nodeServer
 func NewNodeServer(d *driver) *nodeServer {
 	return &nodeServer{
 		DefaultNodeServer: csicommon.NewDefaultNodeServer(d.csiDriver),
 	}
 }
 
+// Run starts the driver and readies listening for grpc requests
 func (d *driver) Run() {
 	openstack.InitOpenStackProvider(d.cloudconfig)
 	csicommon.RunControllerandNodePublishServer(d.endpoint, d.csiDriver, NewControllerServer(d), NewNodeServer(d))
